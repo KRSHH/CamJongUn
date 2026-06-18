@@ -375,12 +375,19 @@ fn release_packages_include_language_bindings() {
     let root = repo_root();
     let local_packager = read_to_string(root.join("scripts/package-release.ps1"));
     let release_workflow = read_to_string(root.join(".github/workflows/release.yml"));
+    let python_loader = read_to_string(root.join("bindings/python/src/camjongun/core.py"));
+    let python_package = read_to_string(root.join("bindings/python/pyproject.toml"));
 
     assert!(local_packager.contains("Copy-Item bindings"));
     assert!(local_packager.contains("node_modules"));
+    assert!(local_packager.contains("bindings/python/src/camjongun/native"));
     assert!(release_workflow.contains("Copy-Item bindings"));
     assert!(release_workflow.contains("language bindings"));
     assert!(release_workflow.contains("__pycache__"));
+    assert!(release_workflow.contains("bindings/python/src/camjongun/native"));
+    assert!(python_loader.contains("CAMJONGUN_ARTIFACT_DIR"));
+    assert!(python_loader.contains("_package_native_dir"));
+    assert!(python_package.contains("native/windows/*"));
 }
 
 #[test]

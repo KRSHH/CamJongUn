@@ -33,9 +33,56 @@ def _default_library_name() -> str:
     return "libcamjongun_ffi.so"
 
 
+def _package_root() -> Path:
+    return Path(__file__).resolve().parent
+
+
+def _package_native_dir() -> Path:
+    return _package_root() / "native"
+
+
+def _library_candidates(path: str | os.PathLike[str] | None) -> list[Path | str]:
+    if path:
+        return [Path(path)]
+
+    env_path = os.environ.get("CAMJONGUN_FFI_PATH")
+    if env_path:
+        return [Path(env_path)]
+
+    name = _default_library_name()
+    package_native = _package_native_dir()
+    return [
+        package_native / name,
+        _package_root() / name,
+        Path.cwd() / name,
+        Path.cwd() / "lib" / name,
+        name,
+    ]
+
+
 def _load_library(path: str | os.PathLike[str] | None = None) -> ctypes.CDLL:
-    chosen = path or os.environ.get("CAMJONGUN_FFI_PATH") or _default_library_name()
-    lib = ctypes.CDLL(str(chosen))
+    package_native = _package_native_dir()
+    if package_native.exists():
+        os.environ.setdefault("CAMJONGUN_ARTIFACT_DIR", str(package_native))
+        if platform.system() == "Windows" and hasattr(os, "add_dll_directory"):
+            os.add_dll_directory(str(package_native))
+
+    errors: list[str] = []
+    for candidate in _library_candidates(path):
+        try:
+            lib = ctypes.CDLL(str(candidate))
+            break
+        except OSError as exc:
+            errors.append(f"{candidate}: {exc}")
+    else:
+        searched = "\n".join(errors)
+        raise CamJongUnError(
+            6,
+            "could not load CamJongUn native library. "
+            "Install a release package with bundled native files or set "
+            f"CAMJONGUN_FFI_PATH. Searched:\n{searched}",
+        )
+
     lib.cju_runtime_init.restype = ctypes.c_int
     lib.cju_runtime_shutdown.restype = None
     lib.cju_camera_ensure.argtypes = [ctypes.c_char_p, ctypes.POINTER(DeviceId)]

@@ -39,6 +39,9 @@ Get-ChildItem (Join-Path $Stage "bindings") -Recurse -Directory |
   Remove-Item -Recurse -Force
 Copy-Item artifacts-needed -Destination (Join-Path $Stage "docs") -Recurse
 Copy-Item native -Destination (Join-Path $Stage "docs") -Recurse
+if (Test-Path artifacts\native) {
+  Copy-Item artifacts\native -Destination (Join-Path $Stage "native") -Recurse
+}
 
 Get-ChildItem target\release -File -ErrorAction SilentlyContinue |
   Where-Object { $_.Name -in @("camjongunctl.exe", "camjongun-installer-helper.exe", "camjongunctl", "camjongun-installer-helper") } |
@@ -48,9 +51,25 @@ Get-ChildItem target\release -File -ErrorAction SilentlyContinue |
   Where-Object { $_.Name -match "^(camjongun_ffi|libcamjongun_ffi)\.(dll|lib|a|so|dylib)$" } |
   Copy-Item -Destination (Join-Path $Stage "lib")
 
+$PyNative = Join-Path $Stage "bindings/python/src/camjongun/native"
+New-Item -ItemType Directory -Force -Path $PyNative | Out-Null
+Get-ChildItem (Join-Path $Stage "lib") -File -ErrorAction SilentlyContinue |
+  Where-Object { $_.Name -match "^(camjongun_ffi|libcamjongun_ffi)\.(dll|so|dylib)$" } |
+  Copy-Item -Destination $PyNative
+
+$PyWindows = Join-Path $PyNative "windows"
+New-Item -ItemType Directory -Force -Path $PyWindows | Out-Null
+foreach ($ArtifactRoot in @((Join-Path $Stage "bin"), (Join-Path $Stage "native/windows"), (Join-Path $Stage "native/windows/bin"))) {
+  if (Test-Path $ArtifactRoot) {
+    Get-ChildItem $ArtifactRoot -File -ErrorAction SilentlyContinue |
+      Where-Object { $_.Name -in @("camjongun-installer-helper.exe", "camjongun-virtualcam-module64.dll", "camjongun-virtualcam-module32.dll") } |
+      Copy-Item -Destination $PyWindows -Force
+  }
+}
+
 "CamJongUn $Version" | Set-Content (Join-Path $Stage "PACKAGE.txt")
 "This package contains the Rust SDK, C ABI artifacts, language bindings, CLI, installer-helper shell, headers, and docs." | Add-Content (Join-Path $Stage "PACKAGE.txt")
-"Native OS camera driver artifacts are still contract-only until platform backend builds are wired." | Add-Content (Join-Path $Stage "PACKAGE.txt")
+"Python release packages vendor the CamJongUn FFI library under camjongun/native so Python apps do not need CAMJONGUN_FFI_PATH in the normal release layout." | Add-Content (Join-Path $Stage "PACKAGE.txt")
 
 $Archive = Join-Path "dist" "$Name.zip"
 if (Test-Path $Archive) {

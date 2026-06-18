@@ -25,12 +25,19 @@ bindings.
 
 ## Native Library Loading
 
-Each binding expects the CamJongUn C ABI library next to the application, in the
-system library path, or pointed to by:
+Release packages vendor the Python native library into the Python package, so a
+normal Python app should not need to set a path manually after installing from a
+CamJongUn release package.
+
+Other bindings expect the CamJongUn C ABI library next to the application, in
+the system library path, or pointed to by:
 
 ```text
 CAMJONGUN_FFI_PATH
 ```
+
+`CAMJONGUN_FFI_PATH` is an escape hatch for custom layouts and local source-tree
+debugging, not the expected release-package path.
 
 Expected library names:
 

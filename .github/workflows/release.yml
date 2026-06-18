@@ -97,6 +97,22 @@ jobs:
           if (Test-Path artifacts\native) {
             Copy-Item artifacts\native -Destination (Join-Path $stage "native") -Recurse
           }
+          $pyNative = Join-Path $stage "bindings/python/src/camjongun/native"
+          New-Item -ItemType Directory -Force -Path $pyNative | Out-Null
+          Get-ChildItem (Join-Path $stage "lib") -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -match "^(camjongun_ffi|libcamjongun_ffi)\.(dll|so|dylib)$" } |
+            Copy-Item -Destination $pyNative
+          if ("${{ matrix.name }}" -eq "windows-x64") {
+            $pyWindows = Join-Path $pyNative "windows"
+            New-Item -ItemType Directory -Force -Path $pyWindows | Out-Null
+            foreach ($root in @((Join-Path $stage "bin"), (Join-Path $stage "native/windows"), (Join-Path $stage "native/windows/bin"))) {
+              if (Test-Path $root) {
+                Get-ChildItem $root -File -ErrorAction SilentlyContinue |
+                  Where-Object { $_.Name -in @("camjongun-installer-helper.exe", "camjongun-virtualcam-module64.dll", "camjongun-virtualcam-module32.dll") } |
+                  Copy-Item -Destination $pyWindows -Force
+              }
+            }
+          }
           "CamJongUn $version ${{ matrix.name }}" | Set-Content (Join-Path $stage "PACKAGE.txt")
           "This package contains the Rust SDK, C ABI artifacts, language bindings, CLI, installer-helper shell, headers, docs, and platform native package outputs where the platform permits them." | Add-Content (Join-Path $stage "PACKAGE.txt")
           if ("${{ matrix.name }}" -eq "macos-universal-contract") {
