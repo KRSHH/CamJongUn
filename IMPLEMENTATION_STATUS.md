@@ -3,6 +3,7 @@
 ## Done
 
 - Rust workspace, SDK crate, C ABI crate, CLI, and installer helper.
+- Language binding scaffolds for C/C++, Python, Node.js, .NET, Go, and Java/JNA.
 - Single app-owned virtual camera registry.
 - Camera naming/editing, install/uninstall, delete, and stream entry points.
 - Windows DirectShow helper flow: one elevated CamJongUn helper registers both
@@ -24,6 +25,8 @@
   signing. Local/ad-hoc artifacts are possible; public ready-to-go distribution
   is still gated by Apple entitlements.
 - Windows ARM64 DirectShow packaging.
+- Non-Rust frame streaming bindings. The current binding packages cover camera
+  lifecycle; streaming needs dedicated C ABI functions first.
 
 ## Verified
 

@@ -78,9 +78,14 @@ jobs:
           New-Item -ItemType Directory -Force -Path (Join-Path $stage "bin") | Out-Null
           New-Item -ItemType Directory -Force -Path (Join-Path $stage "lib") | Out-Null
           New-Item -ItemType Directory -Force -Path (Join-Path $stage "include") | Out-Null
+          New-Item -ItemType Directory -Force -Path (Join-Path $stage "bindings") | Out-Null
           New-Item -ItemType Directory -Force -Path (Join-Path $stage "docs") | Out-Null
           Copy-Item README.md,IMPLEMENTATION_STATUS.md,PACKAGING_CONTRACT.md,identity-rules.md -Destination (Join-Path $stage "docs")
           Copy-Item include\* -Destination (Join-Path $stage "include") -Recurse
+          Copy-Item bindings\* -Destination (Join-Path $stage "bindings") -Recurse
+          Get-ChildItem (Join-Path $stage "bindings") -Recurse -Directory |
+            Where-Object { $_.Name -in @("bin", "obj", "node_modules", "__pycache__") } |
+            Remove-Item -Recurse -Force
           Get-ChildItem target\release -File -ErrorAction SilentlyContinue |
             Where-Object { $_.Name -in @("camjongunctl.exe", "camjongun-installer-helper.exe", "camjongunctl", "camjongun-installer-helper") } |
             Copy-Item -Destination (Join-Path $stage "bin")
@@ -93,7 +98,7 @@ jobs:
             Copy-Item artifacts\native -Destination (Join-Path $stage "native") -Recurse
           }
           "CamJongUn $version ${{ matrix.name }}" | Set-Content (Join-Path $stage "PACKAGE.txt")
-          "This package contains the Rust SDK, C ABI artifacts, CLI, installer-helper shell, headers, docs, and platform native package outputs where the platform permits them." | Add-Content (Join-Path $stage "PACKAGE.txt")
+          "This package contains the Rust SDK, C ABI artifacts, language bindings, CLI, installer-helper shell, headers, docs, and platform native package outputs where the platform permits them." | Add-Content (Join-Path $stage "PACKAGE.txt")
           if ("${{ matrix.name }}" -eq "macos-universal-contract") {
             "macOS public Camera Extension distribution still requires Apple signing/entitlements owned by the distributor." | Add-Content (Join-Path $stage "PACKAGE.txt")
           }

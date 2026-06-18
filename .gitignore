@@ -29,3 +29,9 @@
 *.so
 *.plugin
 *.systemextension
+
+# Language binding build byproducts
+__pycache__/
+/bindings/dotnet/bin/
+/bindings/dotnet/obj/
+/bindings/node/node_modules/

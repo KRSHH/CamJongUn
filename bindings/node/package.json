@@ -1,0 +1,11 @@
+{
+  "name": "@camjongun/sdk",
+  "version": "0.1.0",
+  "description": "Node.js bindings for the CamJongUn virtual camera SDK",
+  "main": "index.js",
+  "license": "GPL-2.0-or-later",
+  "dependencies": {
+    "ffi-napi": "^4.0.3",
+    "ref-napi": "^3.0.3"
+  }
+}

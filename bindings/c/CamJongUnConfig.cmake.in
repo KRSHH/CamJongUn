@@ -1,0 +1,7 @@
+include(CMakeFindDependencyMacro)
+
+add_library(CamJongUn::camjongun_ffi UNKNOWN IMPORTED)
+set_target_properties(CamJongUn::camjongun_ffi PROPERTIES
+  IMPORTED_LOCATION "${CMAKE_CURRENT_LIST_DIR}/../lib/@CAMJONGUN_FFI_LIBRARY@"
+  INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_LIST_DIR}/../include"
+)

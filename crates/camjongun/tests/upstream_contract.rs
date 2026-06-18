@@ -345,6 +345,45 @@ fn platform_adapter_sources_keep_expected_cross_platform_names() {
 }
 
 #[test]
+fn language_binding_packages_are_staged() {
+    let root = repo_root();
+    let expected = [
+        "bindings/README.md",
+        "bindings/c/README.md",
+        "bindings/python/pyproject.toml",
+        "bindings/python/src/camjongun/core.py",
+        "bindings/node/package.json",
+        "bindings/node/index.js",
+        "bindings/dotnet/CamJongUn.csproj",
+        "bindings/dotnet/CamJongUn.cs",
+        "bindings/go/go.mod",
+        "bindings/go/camjongun.go",
+        "bindings/java/build.gradle",
+        "bindings/java/src/main/java/com/camjongun/CamJongUn.java",
+    ];
+
+    for relative in expected {
+        assert!(
+            root.join(relative).exists(),
+            "missing language binding package file: {relative}"
+        );
+    }
+}
+
+#[test]
+fn release_packages_include_language_bindings() {
+    let root = repo_root();
+    let local_packager = read_to_string(root.join("scripts/package-release.ps1"));
+    let release_workflow = read_to_string(root.join(".github/workflows/release.yml"));
+
+    assert!(local_packager.contains("Copy-Item bindings"));
+    assert!(local_packager.contains("node_modules"));
+    assert!(release_workflow.contains("Copy-Item bindings"));
+    assert!(release_workflow.contains("language bindings"));
+    assert!(release_workflow.contains("__pycache__"));
+}
+
+#[test]
 fn windows_adapter_uses_single_helper_install_and_rust_frame_queue() {
     let root = repo_root();
     let windows = read_to_string(root.join("crates/camjongun/src/platform/windows.rs"));

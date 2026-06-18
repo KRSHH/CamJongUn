@@ -16,6 +16,8 @@ SDK layer that will wrap those backends without turning them into a messy fork.
   register/unregister CamJongUn-owned native artifacts.
 - `crates/camjongun-ffi`: Rust-built C ABI bridge for non-Rust consumers.
 - `include/camjongun/camjongun.h`: C ABI header shipped with release packages.
+- `bindings`: package-ready wrappers for C/C++, Python, Node.js, .NET, Go, and
+  Java/JNA built on top of the C ABI.
 - `vendor/obs/platform/windows`: OBS Windows virtual camera output and DirectShow
   camera module source.
 - `vendor/obs/platform/macos`: OBS macOS virtual camera plugin, legacy DAL
@@ -63,6 +65,7 @@ The SDK scaffold now includes:
 
 - a single app-owned virtual camera Rust API
 - a Rust C ABI crate for non-Rust callers
+- thin language bindings for the common native/desktop app ecosystems
 - a persistent CamJongUn device registry
 - camera naming/editing, install/uninstall, and stream management entry points
 - `camjongunctl` for show/ensure/rename/delete/install/uninstall/doctor
@@ -73,7 +76,7 @@ The SDK scaffold now includes:
 - GitHub Actions workflows for cross-platform Rust contracts and native artifact
   contract checks
 - GitHub Actions release packaging for Rust SDK, C ABI, CLI, helper, headers,
-  and docs
+  language bindings, and docs
 
 ## Platform Shipping Requirements
 
