@@ -11,7 +11,7 @@ SDK layer that will wrap those backends without turning them into a messy fork.
 
 - `crates/camjongun`: CamJongUn's Rust SDK layer. This is the canonical
   developer-facing implementation.
-- `crates/camjongunctl`: Rust CLI for create/list/delete/install/uninstall.
+- `crates/camjongunctl`: Rust CLI for show/ensure/rename/delete/install/uninstall.
 - `crates/camjongun-installer-helper`: Rust privileged helper used by the SDK to
   register/unregister CamJongUn-owned native artifacts.
 - `crates/camjongun-ffi`: Rust-built C ABI bridge for non-Rust consumers.
@@ -65,7 +65,7 @@ The SDK scaffold now includes:
 - a Rust C ABI crate for non-Rust callers
 - a persistent CamJongUn device registry
 - camera naming/editing, install/uninstall, and stream management entry points
-- `camjongunctl` for create/list/delete/install/uninstall/doctor
+- `camjongunctl` for show/ensure/rename/delete/install/uninstall/doctor
 - `camjongun-installer-helper` as the future privileged install bridge
 - `identity-rules.md` for OBS conflict avoidance
 - `PACKAGING_CONTRACT.md` for artifact layout and adapter rules

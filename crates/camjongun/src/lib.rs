@@ -9,7 +9,6 @@ use std::fmt;
 use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 pub mod platform;
 
@@ -86,8 +85,6 @@ pub type CjuResult<T> = std::result::Result<T, Error>;
 #[repr(i32)]
 pub enum PixelFormat {
     Nv12 = 0,
-    Yuy2 = 1,
-    Bgra = 2,
 }
 
 impl Default for PixelFormat {
@@ -164,14 +161,8 @@ impl Default for VideoDesc {
 pub struct DeviceId(pub [u8; ID_MAX]);
 
 impl DeviceId {
-    pub fn new_generated() -> Self {
-        let nanos = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_nanos();
-        let process = std::process::id();
-        let text = format!("cju-{nanos:032x}-{process:08x}");
-        Self::from_str_lossy(&text)
+    pub fn app_camera() -> Self {
+        Self::from_str_lossy("cju-app-camera")
     }
 
     pub fn from_str_lossy(value: &str) -> Self {
@@ -216,18 +207,15 @@ impl Default for RuntimeOptions {
 }
 
 #[derive(Debug, Clone)]
-pub struct DeviceCreateDesc {
+pub struct CameraDesc {
     pub display_name: String,
-    pub owner_app: Option<String>,
     pub preferred_video: VideoDesc,
-    pub producer_policy: ProducerPolicy,
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct DeviceUpdateDesc {
+pub struct CameraUpdate {
     pub display_name: Option<String>,
     pub preferred_video: Option<VideoDesc>,
-    pub producer_policy: Option<ProducerPolicy>,
     pub enabled: Option<bool>,
 }
 
@@ -324,7 +312,14 @@ impl Runtime {
         })
     }
 
-    pub fn create_device(&self, desc: DeviceCreateDesc) -> CjuResult<DeviceId> {
+    pub fn ensure_camera(&self, display_name: impl Into<String>) -> CjuResult<DeviceInfo> {
+        self.configure_camera(CameraDesc {
+            display_name: display_name.into(),
+            preferred_video: VideoDesc::default(),
+        })
+    }
+
+    pub fn configure_camera(&self, desc: CameraDesc) -> CjuResult<DeviceInfo> {
         if desc.display_name.trim().is_empty() {
             return Err(Error::new(
                 ResultCode::InvalidArgument,
@@ -332,27 +327,15 @@ impl Runtime {
             ));
         }
 
-        let owner_app = desc.owner_app.unwrap_or_else(|| self.app_name.clone());
-        if let Some(mut device) = self.find_owner_device(&owner_app)? {
-            device.display_name = desc.display_name;
-            device.preferred_video = desc.preferred_video;
-            normalize_video(&mut device.preferred_video);
-            device.producer_policy = desc.producer_policy;
-            device.enabled = true;
-            device.last_error.clear();
-            self.registry.upsert(&device)?;
-            return Ok(device.id);
-        }
-
-        let id = DeviceId::new_generated();
+        let id = DeviceId::app_camera();
         let mut device = DeviceInfo {
             id,
             display_name: desc.display_name,
-            owner_app,
+            owner_app: self.app_name.clone(),
             platform_identity: make_platform_identity(&id),
             device_path: make_device_path(&id),
             preferred_video: desc.preferred_video,
-            producer_policy: desc.producer_policy,
+            producer_policy: ProducerPolicy::RejectSecond,
             enabled: true,
             installed: false,
             visible_to_os: false,
@@ -360,33 +343,25 @@ impl Runtime {
             last_frame_time_ns: 0,
             last_error: String::new(),
         };
-        normalize_video(&mut device.preferred_video);
-        self.registry.upsert(&device)?;
-        Ok(id)
-    }
 
-    pub fn ensure_camera(&self, display_name: impl Into<String>) -> CjuResult<DeviceInfo> {
-        let id = self.create_device(DeviceCreateDesc {
-            display_name: display_name.into(),
-            owner_app: Some(self.app_name.clone()),
-            preferred_video: VideoDesc::default(),
-            producer_policy: ProducerPolicy::RejectSecond,
-        })?;
-        self.registry.get(id)
+        if let Ok(existing) = self.registry.get() {
+            device.installed = existing.installed;
+            device.visible_to_os = existing.visible_to_os;
+            device.streaming = existing.streaming;
+            device.last_frame_time_ns = existing.last_frame_time_ns;
+        }
+
+        normalize_video(&mut device.preferred_video);
+        self.registry.save(&device)?;
+        Ok(device)
     }
 
     pub fn get_camera(&self) -> CjuResult<DeviceInfo> {
-        self.find_owner_device(&self.app_name)?
-            .ok_or_else(|| Error::new(ResultCode::NotFound, "app camera has not been created"))
+        self.registry.get()
     }
 
-    pub fn update_camera(&self, update: DeviceUpdateDesc) -> CjuResult<DeviceInfo> {
-        let device = self.get_camera()?;
-        self.update_device(device.id, update)
-    }
-
-    pub fn update_device(&self, id: DeviceId, update: DeviceUpdateDesc) -> CjuResult<DeviceInfo> {
-        let mut device = self.registry.get(id)?;
+    pub fn update_camera(&self, update: CameraUpdate) -> CjuResult<DeviceInfo> {
+        let mut device = self.registry.get()?;
         if let Some(display_name) = update.display_name {
             if display_name.trim().is_empty() {
                 return Err(Error::new(
@@ -400,64 +375,46 @@ impl Runtime {
             normalize_video(&mut preferred_video);
             device.preferred_video = preferred_video;
         }
-        if let Some(producer_policy) = update.producer_policy {
-            device.producer_policy = producer_policy;
-        }
         if let Some(enabled) = update.enabled {
             device.enabled = enabled;
         }
         device.last_error.clear();
-        self.registry.upsert(&device)?;
+        self.registry.save(&device)?;
         Ok(device)
     }
 
-    pub fn delete_device(&self, id: DeviceId) -> CjuResult<()> {
-        let device = self.registry.get(id)?;
-        if device.installed {
-            let _ = self.uninstall_device(id);
+    pub fn delete_camera(&self) -> CjuResult<()> {
+        if let Ok(device) = self.registry.get() {
+            if device.installed {
+                let _ = self.uninstall_camera();
+            }
         }
-        self.registry.delete(id)
-    }
-
-    pub fn list_devices(&self) -> CjuResult<Vec<DeviceInfo>> {
-        self.registry.load()
+        self.registry.delete()
     }
 
     pub fn platform_report(&self) -> platform::PlatformReport {
         platform::platform_report()
     }
 
-    pub fn get_device(&self, id: DeviceId) -> CjuResult<DeviceInfo> {
-        self.registry.get(id)
-    }
-
     pub fn install_camera(&self) -> CjuResult<()> {
-        self.install_device(self.get_camera()?.id)
-    }
-
-    pub fn install_device(&self, id: DeviceId) -> CjuResult<()> {
-        let mut device = self.registry.get(id)?;
+        let mut device = self.registry.get()?;
         match self.backend.device_install(&device) {
             Ok(()) => {
                 device.installed = true;
                 device.visible_to_os = true;
                 device.last_error.clear();
-                self.registry.upsert(&device)
+                self.registry.save(&device)
             }
             Err(err) => {
                 device.last_error = err.to_string();
-                let _ = self.registry.upsert(&device);
+                let _ = self.registry.save(&device);
                 Err(err)
             }
         }
     }
 
     pub fn uninstall_camera(&self) -> CjuResult<()> {
-        self.uninstall_device(self.get_camera()?.id)
-    }
-
-    pub fn uninstall_device(&self, id: DeviceId) -> CjuResult<()> {
-        let mut device = self.registry.get(id)?;
+        let mut device = self.registry.get()?;
         match self.backend.device_uninstall(&device) {
             Ok(())
             | Err(Error {
@@ -467,19 +424,19 @@ impl Runtime {
                 device.installed = false;
                 device.visible_to_os = false;
                 device.streaming = false;
-                self.registry.upsert(&device)
+                self.registry.save(&device)
             }
             Err(err) => {
                 device.last_error = err.to_string();
-                let _ = self.registry.upsert(&device);
+                let _ = self.registry.save(&device);
                 Err(err)
             }
         }
     }
 
-    pub fn open_stream(&self, id: DeviceId, mut video: VideoDesc) -> CjuResult<Stream<'_>> {
+    pub fn open_camera_stream(&self, mut video: VideoDesc) -> CjuResult<Stream<'_>> {
         normalize_video(&mut video);
-        let mut device = self.registry.get(id)?;
+        let mut device = self.registry.get()?;
         if !device.enabled {
             return Err(Error::new(ResultCode::Unsupported, "device is disabled"));
         }
@@ -494,32 +451,18 @@ impl Runtime {
         device.streaming = true;
         device.preferred_video = video;
         device.last_error.clear();
-        self.registry.upsert(&device)?;
+        self.registry.save(&device)?;
 
         Ok(Stream {
             runtime: self,
-            device_id: id,
             platform,
             open: true,
         })
-    }
-
-    pub fn open_camera_stream(&self, video: VideoDesc) -> CjuResult<Stream<'_>> {
-        self.open_stream(self.get_camera()?.id, video)
-    }
-
-    fn find_owner_device(&self, owner_app: &str) -> CjuResult<Option<DeviceInfo>> {
-        Ok(self
-            .registry
-            .load()?
-            .into_iter()
-            .find(|device| device.owner_app == owner_app))
     }
 }
 
 pub struct Stream<'a> {
     runtime: &'a Runtime,
-    device_id: DeviceId,
     platform: Box<dyn PlatformStream>,
     open: bool,
 }
@@ -530,9 +473,9 @@ impl Stream<'_> {
             return Err(Error::new(ResultCode::NotRunning, "stream is closed"));
         }
         self.platform.push_frame(frame)?;
-        let mut device = self.runtime.registry.get(self.device_id)?;
+        let mut device = self.runtime.registry.get()?;
         device.last_frame_time_ns = frame.timestamp_ns;
-        self.runtime.registry.upsert(&device)?;
+        self.runtime.registry.save(&device)?;
         Ok(())
     }
 
@@ -553,9 +496,9 @@ impl Stream<'_> {
         }
         let result = self.platform.close();
         if result.is_ok() {
-            let mut device = self.runtime.registry.get(self.device_id)?;
+            let mut device = self.runtime.registry.get()?;
             device.streaming = false;
-            self.runtime.registry.upsert(&device)?;
+            self.runtime.registry.save(&device)?;
             self.open = false;
         }
         result
@@ -582,9 +525,12 @@ impl Registry {
         &self.path
     }
 
-    pub fn load(&self) -> CjuResult<Vec<DeviceInfo>> {
+    pub fn get(&self) -> CjuResult<DeviceInfo> {
         if !self.path.exists() {
-            return Ok(Vec::new());
+            return Err(Error::new(
+                ResultCode::NotFound,
+                "app camera has not been created",
+            ));
         }
 
         let mut text = String::new();
@@ -593,16 +539,12 @@ impl Registry {
             .read_to_string(&mut text)
             .map_err(|err| Error::new(ResultCode::BackendError, err.to_string()))?;
 
-        let mut devices = Vec::new();
-        for line in text.lines() {
-            if let Some(device) = deserialize_device(line) {
-                devices.push(device);
-            }
-        }
-        Ok(devices)
+        text.lines()
+            .find_map(deserialize_device)
+            .ok_or_else(|| Error::new(ResultCode::NotFound, "app camera has not been created"))
     }
 
-    pub fn save(&self, devices: &[DeviceInfo]) -> CjuResult<()> {
+    pub fn save(&self, device: &DeviceInfo) -> CjuResult<()> {
         if let Some(parent) = self.path.parent() {
             fs::create_dir_all(parent)
                 .map_err(|err| Error::new(ResultCode::BackendError, err.to_string()))?;
@@ -610,38 +552,20 @@ impl Registry {
 
         let mut file = fs::File::create(&self.path)
             .map_err(|err| Error::new(ResultCode::BackendError, err.to_string()))?;
-        for device in devices {
-            writeln!(file, "{}", serialize_device(device))
-                .map_err(|err| Error::new(ResultCode::BackendError, err.to_string()))?;
-        }
+        writeln!(file, "{}", serialize_device(device))
+            .map_err(|err| Error::new(ResultCode::BackendError, err.to_string()))?;
         Ok(())
     }
 
-    pub fn get(&self, id: DeviceId) -> CjuResult<DeviceInfo> {
-        self.load()?
-            .into_iter()
-            .find(|device| device.id == id)
-            .ok_or_else(|| Error::new(ResultCode::NotFound, id.to_string()))
-    }
-
-    pub fn upsert(&self, device: &DeviceInfo) -> CjuResult<()> {
-        let mut devices = self.load()?;
-        if let Some(existing) = devices.iter_mut().find(|item| item.id == device.id) {
-            *existing = device.clone();
-        } else {
-            devices.push(device.clone());
+    pub fn delete(&self) -> CjuResult<()> {
+        if !self.path.exists() {
+            return Err(Error::new(
+                ResultCode::NotFound,
+                "app camera has not been created",
+            ));
         }
-        self.save(&devices)
-    }
-
-    pub fn delete(&self, id: DeviceId) -> CjuResult<()> {
-        let mut devices = self.load()?;
-        let before = devices.len();
-        devices.retain(|device| device.id != id);
-        if devices.len() == before {
-            return Err(Error::new(ResultCode::NotFound, id.to_string()));
-        }
-        self.save(&devices)
+        fs::remove_file(&self.path)
+            .map_err(|err| Error::new(ResultCode::BackendError, err.to_string()))
     }
 }
 
@@ -742,12 +666,8 @@ fn deserialize_device(line: &str) -> Option<DeviceInfo> {
     })
 }
 
-fn parse_pixel_format(value: &str) -> PixelFormat {
-    match value {
-        "1" => PixelFormat::Yuy2,
-        "2" => PixelFormat::Bgra,
-        _ => PixelFormat::Nv12,
-    }
+fn parse_pixel_format(_value: &str) -> PixelFormat {
+    PixelFormat::Nv12
 }
 
 fn parse_producer_policy(value: &str) -> ProducerPolicy {

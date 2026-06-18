@@ -22,11 +22,11 @@ Runtime/install behavior:
 
 Runtime/frame behavior:
 
-- Frame producers should use `Runtime::open_stream` and `Stream::push_frame`.
+- Frame producers should use `Runtime::open_camera_stream` and `Stream::push_frame`.
 - Frame delivery is owned by the Rust process and the DirectShow shared-memory
   queue, not by a browser tab or other UI timer.
-- Windows v1 accepts NV12 frames directly and BGRA frames through SDK-side NV12
-  conversion.
+- Windows v1 accepts NV12 frames. Apps that produce other formats should
+  convert before calling `Stream::push_frame`.
 
 Source references:
 

@@ -148,9 +148,7 @@ struct WindowsDirectShowStream {
     view: *mut u8,
     width: u32,
     height: u32,
-    format: PixelFormat,
     offsets: [usize; 3],
-    scratch: Vec<u8>,
     closed: bool,
 }
 
@@ -158,10 +156,10 @@ unsafe impl Send for WindowsDirectShowStream {}
 
 impl WindowsDirectShowStream {
     fn open(video: VideoDesc) -> CjuResult<Self> {
-        if !matches!(video.format, PixelFormat::Nv12 | PixelFormat::Bgra) {
+        if video.format != PixelFormat::Nv12 {
             return Err(Error::new(
                 ResultCode::Unsupported,
-                "Windows DirectShow stream supports NV12 and BGRA frames",
+                "Windows DirectShow stream expects NV12 frames",
             ));
         }
 
@@ -231,9 +229,7 @@ impl WindowsDirectShowStream {
             view,
             width: video.width,
             height: video.height,
-            format: video.format,
             offsets,
-            scratch: vec![0; frame_size],
             closed: false,
         })
     }
@@ -274,28 +270,7 @@ impl WindowsDirectShowStream {
 
 impl PlatformStream for WindowsDirectShowStream {
     fn push_frame(&mut self, frame: &Frame<'_>) -> CjuResult<()> {
-        match self.format {
-            PixelFormat::Nv12 => {
-                let data = frame.planes[0];
-                self.write_nv12(data, frame.timestamp_ns)
-            }
-            PixelFormat::Bgra => {
-                bgra_to_nv12(
-                    frame.planes[0],
-                    self.width as usize,
-                    self.height as usize,
-                    &mut self.scratch,
-                )?;
-                let scratch = std::mem::take(&mut self.scratch);
-                let result = self.write_nv12(&scratch, frame.timestamp_ns);
-                self.scratch = scratch;
-                result
-            }
-            PixelFormat::Yuy2 => Err(Error::new(
-                ResultCode::Unsupported,
-                "YUY2 conversion is not implemented for Windows DirectShow stream",
-            )),
-        }
+        self.write_nv12(frame.planes[0], frame.timestamp_ns)
     }
 
     fn update_controls(&mut self, _controls: &Controls) -> CjuResult<()> {
@@ -452,61 +427,6 @@ fn run_helper_elevated(helper: &Path, command: &str, modules: &[&Path]) -> Resul
 
 fn quote_arg(value: &str) -> String {
     format!("\"{}\"", value.replace('"', "\\\""))
-}
-
-fn bgra_to_nv12(bgra: &[u8], width: usize, height: usize, out: &mut [u8]) -> CjuResult<()> {
-    let expected = width * height * 4;
-    if bgra.len() != expected {
-        return Err(Error::new(
-            ResultCode::InvalidArgument,
-            format!(
-                "BGRA frame size mismatch: got {}, expected {}",
-                bgra.len(),
-                expected
-            ),
-        ));
-    }
-
-    let y_size = width * height;
-    for y in 0..height {
-        for x in 0..width {
-            let i = (y * width + x) * 4;
-            let b = bgra[i] as f32;
-            let g = bgra[i + 1] as f32;
-            let r = bgra[i + 2] as f32;
-            out[y * width + x] = clamp(0.257 * r + 0.504 * g + 0.098 * b + 16.0);
-        }
-    }
-
-    for y in (0..height).step_by(2) {
-        for x in (0..width).step_by(2) {
-            let mut u = 0.0;
-            let mut v = 0.0;
-            let mut count = 0.0;
-            for yy in y..(y + 2).min(height) {
-                for xx in x..(x + 2).min(width) {
-                    let i = (yy * width + xx) * 4;
-                    let b = bgra[i] as f32;
-                    let g = bgra[i + 1] as f32;
-                    let r = bgra[i + 2] as f32;
-                    u += -0.148 * r - 0.291 * g + 0.439 * b + 128.0;
-                    v += 0.439 * r - 0.368 * g - 0.071 * b + 128.0;
-                    count += 1.0;
-                }
-            }
-            let uv = y_size + (y / 2) * width + x;
-            if uv + 1 < out.len() {
-                out[uv] = clamp(u / count);
-                out[uv + 1] = clamp(v / count);
-            }
-        }
-    }
-
-    Ok(())
-}
-
-fn clamp(value: f32) -> u8 {
-    value.round().clamp(0.0, 255.0) as u8
 }
 
 fn wide_null(value: &str) -> Vec<u16> {

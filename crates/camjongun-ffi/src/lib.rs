@@ -1,7 +1,4 @@
-use camjongun::{
-    DeviceCreateDesc, DeviceId, DeviceUpdateDesc, ProducerPolicy, ResultCode, Runtime,
-    RuntimeOptions, VideoDesc,
-};
+use camjongun::{CameraUpdate, ResultCode, Runtime, RuntimeOptions};
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int};
 use std::ptr;
@@ -43,7 +40,7 @@ pub extern "C" fn cju_runtime_shutdown() {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn cju_device_create(
+pub unsafe extern "C" fn cju_camera_ensure(
     display_name: *const c_char,
     out_id: *mut CjuDeviceId,
 ) -> c_int {
@@ -55,27 +52,12 @@ pub unsafe extern "C" fn cju_device_create(
         Err(_) => return ResultCode::InvalidArgument as c_int,
     };
 
-    with_runtime(|runtime| {
-        runtime.create_device(DeviceCreateDesc {
-            display_name: name,
-            owner_app: Some("camjongun-ffi".to_string()),
-            preferred_video: VideoDesc::default(),
-            producer_policy: ProducerPolicy::RejectSecond,
+    with_runtime(|runtime| runtime.ensure_camera(name))
+        .map(|camera| {
+            ptr::write(out_id, CjuDeviceId { value: camera.id.0 });
+            ResultCode::Ok as c_int
         })
-    })
-    .map(|id| {
-        ptr::write(out_id, CjuDeviceId { value: id.0 });
-        ResultCode::Ok as c_int
-    })
-    .unwrap_or_else(set_error_and_code)
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn cju_camera_ensure(
-    display_name: *const c_char,
-    out_id: *mut CjuDeviceId,
-) -> c_int {
-    cju_device_create(display_name, out_id)
+        .unwrap_or_else(set_error_and_code)
 }
 
 #[no_mangle]
@@ -89,9 +71,9 @@ pub unsafe extern "C" fn cju_camera_rename(display_name: *const c_char) -> c_int
     };
 
     with_runtime(|runtime| {
-        runtime.update_camera(DeviceUpdateDesc {
+        runtime.update_camera(CameraUpdate {
             display_name: Some(name),
-            ..DeviceUpdateDesc::default()
+            ..CameraUpdate::default()
         })
     })
     .map(|_| ResultCode::Ok as c_int)
@@ -108,13 +90,6 @@ pub extern "C" fn cju_camera_install() -> c_int {
 #[no_mangle]
 pub extern "C" fn cju_camera_uninstall() -> c_int {
     with_runtime(|runtime| runtime.uninstall_camera())
-        .map(|_| ResultCode::Ok as c_int)
-        .unwrap_or_else(set_error_and_code)
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn cju_device_delete(id: CjuDeviceId) -> c_int {
-    with_runtime(|runtime| runtime.delete_device(DeviceId(id.value)))
         .map(|_| ResultCode::Ok as c_int)
         .unwrap_or_else(set_error_and_code)
 }

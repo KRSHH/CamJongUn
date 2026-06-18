@@ -1,6 +1,6 @@
 use camjongun::{
-    make_device_path, make_platform_identity, DeviceCreateDesc, DeviceId, PixelFormat,
-    ProducerPolicy, Runtime, RuntimeOptions, VideoDesc,
+    make_device_path, make_platform_identity, CameraDesc, CameraUpdate, DeviceId, PixelFormat,
+    Runtime, RuntimeOptions, VideoDesc,
 };
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -150,7 +150,7 @@ fn generated_camjongun_identities_do_not_reuse_obs_names() {
 }
 
 #[test]
-fn registry_create_list_get_delete_round_trip_is_stable() {
+fn registry_camera_round_trip_is_stable() {
     let registry_path = temp_registry_path("round-trip");
     let runtime = Runtime::new(RuntimeOptions {
         app_name: "contract-test".to_string(),
@@ -159,10 +159,9 @@ fn registry_create_list_get_delete_round_trip_is_stable() {
     })
     .expect("runtime should initialize");
 
-    let id = runtime
-        .create_device(DeviceCreateDesc {
+    let camera = runtime
+        .configure_camera(CameraDesc {
             display_name: "Contract Camera".to_string(),
-            owner_app: Some("contract-test".to_string()),
             preferred_video: VideoDesc {
                 width: 1280,
                 height: 720,
@@ -170,37 +169,29 @@ fn registry_create_list_get_delete_round_trip_is_stable() {
                 fps_den: 1,
                 format: PixelFormat::Nv12,
             },
-            producer_policy: ProducerPolicy::RejectSecond,
         })
-        .expect("device should be created");
+        .expect("camera should be configured");
 
-    let listed = runtime
-        .list_devices()
-        .expect("registry should list devices");
-    assert_eq!(listed.len(), 1);
-    assert_eq!(listed[0].id, id);
-    assert_eq!(listed[0].display_name, "Contract Camera");
-    assert!(listed[0]
+    assert_eq!(camera.display_name, "Contract Camera");
+    assert_eq!(camera.owner_app, "contract-test");
+    assert!(camera
         .platform_identity
         .starts_with("camjongun.virtual-camera."));
 
     let fetched = runtime
-        .get_device(id)
-        .expect("created device should be fetchable");
+        .get_camera()
+        .expect("configured camera should be fetchable");
     assert_eq!(fetched.preferred_video.width, 1280);
     assert_eq!(fetched.preferred_video.height, 720);
 
-    runtime.delete_device(id).expect("device should delete");
-    assert!(runtime
-        .list_devices()
-        .expect("registry should list after delete")
-        .is_empty());
+    runtime.delete_camera().expect("camera should delete");
+    assert!(runtime.get_camera().is_err());
 
     let _ = fs::remove_file(registry_path);
 }
 
 #[test]
-fn runtime_keeps_one_camera_per_app_owner() {
+fn runtime_keeps_one_camera_record() {
     let registry_path = temp_registry_path("single-camera");
     let runtime = Runtime::new(RuntimeOptions {
         app_name: "single-camera-test".to_string(),
@@ -210,17 +201,11 @@ fn runtime_keeps_one_camera_per_app_owner() {
     .expect("runtime should initialize");
 
     let first = runtime
-        .create_device(DeviceCreateDesc {
-            display_name: "First Name".to_string(),
-            owner_app: None,
-            preferred_video: VideoDesc::default(),
-            producer_policy: ProducerPolicy::RejectSecond,
-        })
+        .ensure_camera("First Name")
         .expect("first camera should be created");
     let second = runtime
-        .create_device(DeviceCreateDesc {
+        .configure_camera(CameraDesc {
             display_name: "Renamed Camera".to_string(),
-            owner_app: None,
             preferred_video: VideoDesc {
                 width: 640,
                 height: 360,
@@ -228,18 +213,16 @@ fn runtime_keeps_one_camera_per_app_owner() {
                 fps_den: 1,
                 format: PixelFormat::Nv12,
             },
-            producer_policy: ProducerPolicy::RejectSecond,
         })
-        .expect("second create should update existing app camera");
+        .expect("second configure should update existing app camera");
 
-    assert_eq!(first, second);
-    let devices = runtime.list_devices().expect("registry should list");
-    assert_eq!(devices.len(), 1);
-    assert_eq!(devices[0].display_name, "Renamed Camera");
-    assert_eq!(devices[0].owner_app, "single-camera-test");
+    assert_eq!(first.id, second.id);
+    let camera = runtime.get_camera().expect("registry should get camera");
+    assert_eq!(camera.display_name, "Renamed Camera");
+    assert_eq!(camera.owner_app, "single-camera-test");
 
     let updated = runtime
-        .update_camera(camjongun::DeviceUpdateDesc {
+        .update_camera(CameraUpdate {
             display_name: Some("Edited Camera".to_string()),
             enabled: Some(false),
             ..Default::default()
@@ -252,7 +235,7 @@ fn runtime_keeps_one_camera_per_app_owner() {
 }
 
 #[test]
-fn registry_ignores_malformed_lines_and_keeps_valid_rows() {
+fn registry_ignores_malformed_lines_and_reads_valid_camera() {
     let registry_path = temp_registry_path("compat");
     let valid_id = "cju-compat";
     let valid_row = [
@@ -287,14 +270,38 @@ fn registry_ignores_malformed_lines_and_keeps_valid_rows() {
     })
     .expect("runtime should initialize");
 
-    let devices = runtime
-        .list_devices()
-        .expect("registry should parse valid rows");
-    assert_eq!(devices.len(), 1);
-    assert_eq!(devices[0].id, DeviceId::from_str_lossy(valid_id));
-    assert_eq!(devices[0].last_frame_time_ns, 123);
+    let camera = runtime
+        .get_camera()
+        .expect("registry should parse valid row");
+    assert_eq!(camera.id, DeviceId::from_str_lossy(valid_id));
+    assert_eq!(camera.last_frame_time_ns, 123);
 
     let _ = fs::remove_file(registry_path);
+}
+
+#[test]
+fn old_multicamera_api_names_are_removed_from_runtime() {
+    let source = read_to_string(repo_root().join("crates/camjongun/src/lib.rs"));
+    for old_name in [
+        "pub fn create_device",
+        "pub fn delete_device",
+        "pub fn list_devices",
+        "pub fn get_device",
+        "pub fn install_device",
+        "pub fn uninstall_device",
+    ] {
+        assert!(
+            !source.contains(old_name),
+            "runtime still exposes old multi-device API: {old_name}"
+        );
+    }
+}
+
+#[test]
+fn runtime_source_uses_single_record_registry() {
+    let source = read_to_string(repo_root().join("crates/camjongun/src/lib.rs"));
+    assert!(!source.contains("Vec<DeviceInfo>"));
+    assert!(!source.contains("devices.retain"));
 }
 
 #[test]
