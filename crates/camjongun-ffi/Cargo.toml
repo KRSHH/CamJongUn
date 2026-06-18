@@ -1,0 +1,12 @@
+[package]
+name = "camjongun-ffi"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "camjongun_ffi"
+crate-type = ["cdylib", "staticlib"]
+
+[dependencies]
+camjongun = { path = "../camjongun" }

@@ -1,0 +1,73 @@
+name: CamJongUn Native Artifact Checks
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "vendor/obs/**"
+      - "native/**"
+      - "crates/camjongun/src/platform/**"
+      - ".github/workflows/native-artifacts.yml"
+
+jobs:
+  windows-directshow:
+    name: Windows DirectShow artifact contract
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Validate Windows adapter contract
+        run: cargo test -p camjongun --test upstream_contract
+
+      - name: Native build status
+        shell: pwsh
+        run: |
+          Write-Host "Windows native DirectShow artifact build is not wired yet."
+          Write-Host "Expected future outputs:"
+          Write-Host "  artifacts/windows/camjongun-virtualcam-module32.dll"
+          Write-Host "  artifacts/windows/camjongun-virtualcam-module64.dll"
+          Write-Host "  artifacts/windows/camjongun-virtualcam-module-arm64.dll"
+
+  macos-camera-extension:
+    name: macOS Camera Extension artifact contract
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Validate macOS adapter contract
+        run: cargo test -p camjongun --test upstream_contract
+
+      - name: Native build status
+        run: |
+          echo "macOS native Camera Extension/DAL artifact build is not wired yet."
+          echo "Expected future outputs:"
+          echo "  artifacts/macos/com.camjongun.virtual-camera.systemextension"
+          echo "  artifacts/macos/camjongun-mac-virtualcam.plugin"
+
+  linux-v4l2:
+    name: Linux V4L2 artifact contract
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Validate Linux adapter contract
+        run: cargo test -p camjongun --test upstream_contract
+
+      - name: Native build status
+        run: |
+          echo "Linux v4l2loopback helper/device mapping is not wired yet."
+          echo "Expected future behavior:"
+          echo "  install or require v4l2loopback"
+          echo "  create CamJongUn-labeled /dev/video* mappings"

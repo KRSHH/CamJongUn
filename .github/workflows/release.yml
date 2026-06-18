@@ -1,0 +1,127 @@
+name: CamJongUn Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version, for example v0.1.0"
+        required: true
+        default: "v0.1.0"
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    name: Package ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: windows-x64
+            os: windows-latest
+            archive: zip
+          - name: macos-universal-contract
+            os: macos-latest
+            archive: tar.gz
+          - name: linux-x64
+            os: ubuntu-latest
+            archive: tar.gz
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Test workspace
+        run: cargo test --workspace
+
+      - name: Build release binaries
+        run: cargo build --workspace --release
+
+      - name: Stage package
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}"
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            $version = "${{ inputs.version }}"
+          }
+          $package = "camjongun-$version-${{ matrix.name }}"
+          $stage = Join-Path "dist" $package
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+          New-Item -ItemType Directory -Force -Path (Join-Path $stage "bin") | Out-Null
+          New-Item -ItemType Directory -Force -Path (Join-Path $stage "lib") | Out-Null
+          New-Item -ItemType Directory -Force -Path (Join-Path $stage "include") | Out-Null
+          New-Item -ItemType Directory -Force -Path (Join-Path $stage "docs") | Out-Null
+          Copy-Item README.md,IMPLEMENTATION_STATUS.md,PACKAGING_CONTRACT.md,identity-rules.md -Destination (Join-Path $stage "docs")
+          Copy-Item include\* -Destination (Join-Path $stage "include") -Recurse
+          Get-ChildItem target\release -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -in @("camjongunctl.exe", "camjongun-installer-helper.exe", "camjongunctl", "camjongun-installer-helper") } |
+            Copy-Item -Destination (Join-Path $stage "bin")
+          Get-ChildItem target\release -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -match "^(camjongun_ffi|libcamjongun_ffi)\\.(dll|lib|a|so|dylib)$" } |
+            Copy-Item -Destination (Join-Path $stage "lib")
+          Copy-Item artifacts-needed -Destination (Join-Path $stage "docs") -Recurse
+          Copy-Item native -Destination (Join-Path $stage "docs") -Recurse
+          "CamJongUn $version ${{ matrix.name }}" | Set-Content (Join-Path $stage "PACKAGE.txt")
+          "This package contains the Rust SDK, C ABI artifacts, CLI, installer-helper shell, headers, and docs. Native OS camera driver artifacts are still contract-only until platform backend builds are wired." | Add-Content (Join-Path $stage "PACKAGE.txt")
+
+      - name: Archive package
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}"
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            $version = "${{ inputs.version }}"
+          }
+          $package = "camjongun-$version-${{ matrix.name }}"
+          $stage = Join-Path "dist" $package
+          if ("${{ matrix.archive }}" -eq "zip") {
+            Compress-Archive -Path "$stage\*" -DestinationPath "dist\$package.zip" -Force
+          } else {
+            tar -czf "dist/$package.tar.gz" -C dist $package
+          }
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: camjongun-${{ matrix.name }}
+          path: |
+            dist/*.zip
+            dist/*.tar.gz
+
+  github-release:
+    name: Publish GitHub Release
+    needs: package
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Download packages
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+          merge-multiple: true
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            tag="${{ inputs.version }}"
+          fi
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" release-artifacts/* --clobber
+          else
+            gh release create "$tag" release-artifacts/* --title "CamJongUn $tag" --notes "Rust SDK/FFI/CLI release package. Native OS camera artifacts remain contract-only until platform backend builds are wired."
+          fi

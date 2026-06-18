@@ -1,0 +1,28 @@
+# Rust build outputs
+/target/
+
+# Old or local build outputs
+/build/
+/build-*/
+/cmake-build-*/
+
+# Local smoke-test state
+/**/test-appdata*/
+/**/devices.tsv
+
+# Packaged native artifacts generated later
+/dist/
+/artifacts/
+/package/
+
+# Platform build byproducts
+*.pdb
+*.ilk
+*.exp
+*.lib
+*.dll
+*.exe
+*.dylib
+*.so
+*.plugin
+*.systemextension
