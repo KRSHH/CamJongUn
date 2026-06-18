@@ -50,6 +50,21 @@ jobs:
       - name: Build release binaries
         run: cargo build --workspace --release
 
+      - name: Build Windows native package
+        if: matrix.name == 'windows-x64'
+        shell: pwsh
+        run: |
+          $env:CAMJONGUN_BUILD_X86 = "1"
+          .\scripts\native-windows-package.ps1
+
+      - name: Build macOS native support package
+        if: matrix.name == 'macos-universal-contract'
+        run: bash scripts/native-macos-package.sh
+
+      - name: Build Linux native package
+        if: matrix.name == 'linux-x64'
+        run: bash scripts/native-linux-package.sh
+
       - name: Stage package
         shell: pwsh
         run: |
@@ -74,8 +89,14 @@ jobs:
             Copy-Item -Destination (Join-Path $stage "lib")
           Copy-Item artifacts-needed -Destination (Join-Path $stage "docs") -Recurse
           Copy-Item native -Destination (Join-Path $stage "docs") -Recurse
+          if (Test-Path artifacts\native) {
+            Copy-Item artifacts\native -Destination (Join-Path $stage "native") -Recurse
+          }
           "CamJongUn $version ${{ matrix.name }}" | Set-Content (Join-Path $stage "PACKAGE.txt")
-          "This package contains the Rust SDK, C ABI artifacts, CLI, installer-helper shell, headers, and docs. Native OS camera driver artifacts are still contract-only until platform backend builds are wired." | Add-Content (Join-Path $stage "PACKAGE.txt")
+          "This package contains the Rust SDK, C ABI artifacts, CLI, installer-helper shell, headers, docs, and platform native package outputs where the platform permits them." | Add-Content (Join-Path $stage "PACKAGE.txt")
+          if ("${{ matrix.name }}" -eq "macos-universal-contract") {
+            "macOS public Camera Extension distribution still requires Apple signing/entitlements owned by the distributor." | Add-Content (Join-Path $stage "PACKAGE.txt")
+          }
 
       - name: Archive package
         shell: pwsh
@@ -126,5 +147,5 @@ jobs:
           if gh release view "$tag" >/dev/null 2>&1; then
             gh release upload "$tag" release-artifacts/* --clobber
           else
-            gh release create "$tag" release-artifacts/* --title "CamJongUn $tag" --notes "Rust SDK/FFI/CLI release package. Native OS camera artifacts remain contract-only until platform backend builds are wired."
+            gh release create "$tag" release-artifacts/* --title "CamJongUn $tag" --notes "Rust SDK/FFI/CLI release package with native platform packages. macOS public Camera Extension distribution still requires Apple signing/entitlements."
           fi

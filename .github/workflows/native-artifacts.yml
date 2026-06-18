@@ -11,7 +11,7 @@ on:
 
 jobs:
   windows-directshow:
-    name: Windows DirectShow artifact contract
+    name: Windows DirectShow native artifacts
     runs-on: windows-latest
     steps:
       - name: Checkout
@@ -23,17 +23,20 @@ jobs:
       - name: Validate Windows adapter contract
         run: cargo test -p camjongun --test upstream_contract
 
-      - name: Native build status
+      - name: Build Windows DirectShow native package
         shell: pwsh
         run: |
-          Write-Host "Windows native DirectShow artifact build is not wired yet."
-          Write-Host "Expected future outputs:"
-          Write-Host "  artifacts/windows/camjongun-virtualcam-module32.dll"
-          Write-Host "  artifacts/windows/camjongun-virtualcam-module64.dll"
-          Write-Host "  artifacts/windows/camjongun-virtualcam-module-arm64.dll"
+          $env:CAMJONGUN_BUILD_X86 = "1"
+          .\scripts\native-windows-package.ps1
+
+      - name: Upload Windows native package
+        uses: actions/upload-artifact@v4
+        with:
+          name: camjongun-native-windows
+          path: artifacts/native/windows/**
 
   macos-camera-extension:
-    name: macOS Camera Extension artifact contract
+    name: macOS native support package
     runs-on: macos-latest
     steps:
       - name: Checkout
@@ -45,15 +48,17 @@ jobs:
       - name: Validate macOS adapter contract
         run: cargo test -p camjongun --test upstream_contract
 
-      - name: Native build status
-        run: |
-          echo "macOS native Camera Extension/DAL artifact build is not wired yet."
-          echo "Expected future outputs:"
-          echo "  artifacts/macos/com.camjongun.virtual-camera.systemextension"
-          echo "  artifacts/macos/camjongun-mac-virtualcam.plugin"
+      - name: Build macOS native support package
+        run: bash scripts/native-macos-package.sh
+
+      - name: Upload macOS native support package
+        uses: actions/upload-artifact@v4
+        with:
+          name: camjongun-native-macos
+          path: artifacts/native/macos/**
 
   linux-v4l2:
-    name: Linux V4L2 artifact contract
+    name: Linux V4L2 native package
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -65,9 +70,11 @@ jobs:
       - name: Validate Linux adapter contract
         run: cargo test -p camjongun --test upstream_contract
 
-      - name: Native build status
-        run: |
-          echo "Linux v4l2loopback helper/device mapping is not wired yet."
-          echo "Expected future behavior:"
-          echo "  install or require v4l2loopback"
-          echo "  create CamJongUn-labeled /dev/video* mappings"
+      - name: Build Linux native package
+        run: bash scripts/native-linux-package.sh
+
+      - name: Upload Linux native package
+        uses: actions/upload-artifact@v4
+        with:
+          name: camjongun-native-linux
+          path: artifacts/native/linux/**

@@ -15,6 +15,9 @@
 /artifacts/
 /package/
 
+# Native dependency checkouts fetched by scripts/CI
+/vendor/obs/deps/libdshowcapture/src/
+
 # Platform build byproducts
 *.pdb
 *.ilk

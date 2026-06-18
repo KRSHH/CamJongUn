@@ -22,24 +22,26 @@
 - GitHub Actions workflows for Windows/macOS/Linux Rust contract checks and
   native artifact contract checks.
 - GitHub Actions release workflow for Rust SDK/FFI/CLI/helper/header packages.
+- GitHub Actions native package jobs for Windows, Linux, and macOS support
+  artifacts.
 - C ABI header in `include/camjongun/camjongun.h`.
 - Local package and GitHub publish helper scripts.
 
 ## Not Done Yet
 
-- Windows DirectShow module generation/registration per camera. The adapter now
-  knows the CamJongUn artifact names and reports missing packaged DLLs cleanly.
+- Windows DirectShow module generation/registration per camera. A standalone
+  native build scaffold now exists for CamJongUn-named DirectShow DLLs.
 - Windows per-camera shared memory queue wiring.
 - macOS Camera Extension/DAL identity templating and activation. The adapter now
   knows the CamJongUn bundle artifact names and reports missing packages cleanly.
-- Linux `v4l2loopback` install/load/device mapping integration. The adapter now
-  checks for `v4l2loopback` availability and reports helper requirements.
+- Linux exact `/dev/video*` mapping persistence and safe per-device uninstall.
+  Install now attempts `v4l2loopback-ctl add` or privileged `modprobe`.
 - Real frame delivery into the OBS-derived platform backends through Rust
   adapters.
 - Privilege elevation UX for the installer helper.
-- GitHub Actions native artifact workflows currently document expected outputs
-  and run contract checks; they do not yet produce DirectShow, Camera Extension,
-  DAL, or V4L2 helper artifacts.
+- macOS public Camera Extension distribution without an Apple Developer Program
+  signing/entitlement setup. Local/ad-hoc support packages are produced; public
+  ready-to-go Camera Extension artifacts remain gated by Apple signing.
 - `vendor/obs/deps/libdshowcapture/src` is currently empty because the source
   OBS checkout has the `deps/libdshowcapture/src` submodule uninitialized.
   Windows backend builds need that submodule populated before native DirectShow

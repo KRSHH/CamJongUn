@@ -101,8 +101,15 @@ delivery still needs to be wired behind the Rust wrapper.
 
 When CamJongUn is used as its own repository, GitHub Actions in `.github/`
 checks the Rust SDK and upstream contracts on Windows, macOS, and Linux. Native
-artifact workflows currently validate contracts and document expected outputs;
-they will become real native builds as the platform backends are implemented.
+artifact workflows build/package platform outputs where possible:
+
+- Windows: DirectShow module build scaffold, helper, and package output.
+- Linux: helper plus `v4l2loopback` install support package.
+- macOS: helper, native source/support package, and no-paid-account constraints.
+
+macOS public Camera Extension distribution still requires Apple signing and the
+required entitlements. Without that, CamJongUn can only ship local/ad-hoc
+development artifacts for macOS.
 
 ## Releases
 

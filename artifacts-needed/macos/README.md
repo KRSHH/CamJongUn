@@ -17,6 +17,14 @@ Runtime/install behavior:
 - Keep legacy DAL install/update/uninstall behavior only for CamJongUn-owned bundles.
 - Never remove or update OBS virtual camera bundles.
 
+No-paid-account constraint:
+
+- CamJongUn can ship local/ad-hoc development artifacts without the Apple
+  Developer Program.
+- A public ready-to-go Camera Extension equivalent to OBS release behavior still
+  requires Apple-controlled signing/entitlements. There is no clean technical
+  bypass for that in the OBS source tree.
+
 Source references:
 
 - `vendor/obs/platform/macos/obs-plugin/`
