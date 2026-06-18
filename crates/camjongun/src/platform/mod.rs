@@ -87,6 +87,7 @@ fn artifact(name: &'static str, purpose: &'static str, relative_path: &str) -> P
     }
 }
 
+#[allow(dead_code)]
 fn missing_artifacts_error(report: &PlatformReport) -> Option<Error> {
     let missing: Vec<&str> = report
         .artifacts
@@ -110,6 +111,7 @@ fn missing_artifacts_error(report: &PlatformReport) -> Option<Error> {
     }
 }
 
+#[allow(dead_code)]
 fn streaming_not_wired(
     _device: &DeviceInfo,
     _video: VideoDesc,

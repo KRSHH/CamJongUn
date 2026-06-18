@@ -16,9 +16,6 @@ dependencies = [
 [[package]]
 name = "camjongun-installer-helper"
 version = "0.1.0"
-dependencies = [
- "camjongun",
-]
 
 [[package]]
 name = "camjongunctl"

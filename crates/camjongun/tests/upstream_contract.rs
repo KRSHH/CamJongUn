@@ -25,6 +25,13 @@ fn collect_files(root: &Path, files: &mut Vec<PathBuf>) {
     {
         let entry = entry.expect("directory entry should be readable");
         let path = entry.path();
+        if path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| matches!(name, ".git" | "build" | "target"))
+        {
+            continue;
+        }
         if path.is_dir() {
             collect_files(&path, files);
         } else {
@@ -44,7 +51,10 @@ fn tree_contains(root: &Path, needle: &str) -> bool {
                 .extension()
                 .and_then(|ext| ext.to_str())
                 .is_some_and(|ext| {
-                    matches!(ext, "png" | "icns" | "tiff" | "exe" | "dll" | "lib" | "pdb")
+                    matches!(
+                        ext,
+                        "png" | "icns" | "tiff" | "exe" | "dll" | "lib" | "pdb" | "obj" | "exp"
+                    )
                 })
         })
         .any(|path| read_to_string(path).contains(needle))
@@ -269,7 +279,27 @@ fn platform_adapter_sources_keep_expected_cross_platform_names() {
 
     assert!(windows.contains("camjongun-virtualcam-module64.dll"));
     assert!(windows.contains("camjongun-virtualcam-module32.dll"));
+    assert!(windows.contains("camjongun-installer-helper.exe"));
     assert!(macos.contains("com.camjongun.virtual-camera.systemextension"));
     assert!(macos.contains("camjongun-mac-virtualcam.plugin"));
     assert!(linux.contains("v4l2loopback"));
+}
+
+#[test]
+fn windows_adapter_uses_single_helper_install_and_rust_frame_queue() {
+    let root = repo_root();
+    let windows = read_to_string(root.join("crates/camjongun/src/platform/windows.rs"));
+    let helper = read_to_string(root.join("crates/camjongun-installer-helper/src/main.rs"));
+
+    assert!(windows.contains("ShellExecuteExW"));
+    assert!(windows.contains("directshow-install"));
+    assert!(windows.contains("directshow-uninstall"));
+    assert!(windows.contains("CamJongUnVirtualCamVideo"));
+    assert!(windows.contains("WindowsDirectShowStream"));
+    assert!(!windows.contains("streaming_not_wired"));
+
+    assert!(helper.contains("directshow-install"));
+    assert!(helper.contains("directshow-uninstall"));
+    assert!(helper.contains("System32\\regsvr32.exe"));
+    assert!(helper.contains("SysWOW64\\regsvr32.exe"));
 }

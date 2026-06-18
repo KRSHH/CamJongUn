@@ -12,8 +12,8 @@ SDK layer that will wrap those backends without turning them into a messy fork.
 - `crates/camjongun`: CamJongUn's Rust SDK layer. This is the canonical
   developer-facing implementation.
 - `crates/camjongunctl`: Rust CLI for create/list/delete/install/uninstall.
-- `crates/camjongun-installer-helper`: Rust helper shell for future privileged
-  install/uninstall work.
+- `crates/camjongun-installer-helper`: Rust privileged helper used by the SDK to
+  register/unregister CamJongUn-owned native artifacts.
 - `crates/camjongun-ffi`: Rust-built C ABI bridge for non-Rust consumers.
 - `include/camjongun/camjongun.h`: C ABI header shipped with release packages.
 - `vendor/obs/platform/windows`: OBS Windows virtual camera output and DirectShow
@@ -77,9 +77,10 @@ The SDK scaffold now includes:
 
 ## Platform Shipping Requirements
 
-Windows needs built DirectShow module DLLs and registration with `regsvr32`.
-The OBS-side plugin alone is not enough for apps like browsers, Zoom, or
-Discord to see a camera device.
+Windows needs built DirectShow module DLLs. Developer apps should call the SDK
+install API; the SDK launches the CamJongUn helper once with UAC and the helper
+silently registers both 64-bit and 32-bit modules. Developer apps should not
+spawn PowerShell, call `regsvr32`, or copy DLLs manually.
 
 macOS needs bundled and signed plugin/system-extension artifacts, bundle IDs,
 UUIDs, entitlements, `/Applications` placement behavior, and user approval
@@ -92,10 +93,10 @@ must install or require that module per distro.
 ## Current Status
 
 This now builds a standalone Rust CamJongUn SDK scaffold and tools. Device
-create/list/delete is implemented through the CamJongUn registry. Platform
-adapters now exist and report required artifacts/privilege needs. They do not
-fake OS camera registration or streaming; Windows, macOS, and Linux frame
-delivery still needs to be wired behind the Rust wrapper.
+create/list/delete is implemented through the CamJongUn registry. Windows
+install/uninstall and DirectShow shared-memory frame delivery are wired through
+the Rust adapter and packaged helper. macOS and Linux still expose artifact and
+privilege contracts while their frame delivery remains backend work.
 
 ## CI
 
