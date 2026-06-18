@@ -118,7 +118,7 @@ fn streaming_not_wired(
 ) -> CjuResult<Box<dyn PlatformStream>> {
     Err(Error::new(
         ResultCode::PlatformUnavailable,
-        "platform install artifacts can be validated, but frame streaming is not wired yet",
+        "frame streaming is not wired for this platform adapter yet",
     ))
 }
 

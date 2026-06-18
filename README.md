@@ -46,9 +46,9 @@ All platform backends expose/register the output id:
 virtualcam_output
 ```
 
-A future CamJongUn SDK should hide the platform setup from developers. A
-developer using the library should not have to manually register DLLs, approve
-extensions, or figure out V4L2 devices.
+CamJongUn should hide platform setup from developers. A developer using the
+library should not have to manually register DLLs, approve extensions, or figure
+out V4L2 devices.
 
 The intended architecture is:
 
@@ -66,7 +66,7 @@ The SDK scaffold now includes:
 - a persistent CamJongUn device registry
 - camera naming/editing, install/uninstall, and stream management entry points
 - `camjongunctl` for show/ensure/rename/delete/install/uninstall/doctor
-- `camjongun-installer-helper` as the future privileged install bridge
+- `camjongun-installer-helper` as the privileged install bridge
 - `identity-rules.md` for OBS conflict avoidance
 - `PACKAGING_CONTRACT.md` for artifact layout and adapter rules
 - upstream contract tests for OBS refresh safety

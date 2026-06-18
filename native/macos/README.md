@@ -2,7 +2,7 @@
 
 Goal: build CamJongUn-owned Camera Extension and optional legacy DAL bundles.
 
-Future outputs:
+Planned outputs:
 
 - `com.camjongun.virtual-camera.systemextension`
 - `camjongun-mac-virtualcam.plugin`
@@ -10,7 +10,7 @@ Future outputs:
 Rules:
 
 - Use CamJongUn bundle IDs and Mach services.
-- Generate Camera Extension device/source/sink UUIDs per camera.
+- Use CamJongUn Camera Extension device/source/sink UUIDs for the app-owned camera.
 - Keep signing, entitlement, and user approval behavior explicit.
 - Do not install, update, or remove OBS camera bundles.
 

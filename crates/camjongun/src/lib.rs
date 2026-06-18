@@ -95,35 +95,6 @@ impl Default for PixelFormat {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(i32)]
-pub enum FitMode {
-    Fit = 0,
-    Fill = 1,
-    Stretch = 2,
-}
-
-impl Default for FitMode {
-    fn default() -> Self {
-        Self::Fit
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(i32)]
-pub enum Rotation {
-    R0 = 0,
-    R90 = 90,
-    R180 = 180,
-    R270 = 270,
-}
-
-impl Default for Rotation {
-    fn default() -> Self {
-        Self::R0
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(i32)]
 pub enum ProducerPolicy {
     RejectSecond = 0,
     Takeover = 1,
@@ -237,31 +208,6 @@ pub struct DeviceInfo {
 }
 
 #[derive(Debug, Clone)]
-pub struct Controls {
-    pub enabled: bool,
-    pub mirror: bool,
-    pub flip: bool,
-    pub rotation: Rotation,
-    pub fit_mode: FitMode,
-    pub background_rgba: u32,
-    pub placeholder_frame: Option<Vec<u8>>,
-}
-
-impl Default for Controls {
-    fn default() -> Self {
-        Self {
-            enabled: true,
-            mirror: false,
-            flip: false,
-            rotation: Rotation::R0,
-            fit_mode: FitMode::Fit,
-            background_rgba: 0x000000ff,
-            placeholder_frame: None,
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
 pub struct Frame<'a> {
     pub planes: [&'a [u8]; 4],
     pub linesize: [u32; 4],
@@ -280,7 +226,6 @@ pub trait PlatformBackend: Send + Sync {
 
 pub trait PlatformStream: Send {
     fn push_frame(&mut self, frame: &Frame<'_>) -> CjuResult<()>;
-    fn update_controls(&mut self, controls: &Controls) -> CjuResult<()>;
     fn close(&mut self) -> CjuResult<()>;
 }
 
@@ -477,13 +422,6 @@ impl Stream<'_> {
         device.last_frame_time_ns = frame.timestamp_ns;
         self.runtime.registry.save(&device)?;
         Ok(())
-    }
-
-    pub fn update_controls(&mut self, controls: &Controls) -> CjuResult<()> {
-        if !self.open {
-            return Err(Error::new(ResultCode::NotRunning, "stream is closed"));
-        }
-        self.platform.update_controls(controls)
     }
 
     pub fn close(mut self) -> CjuResult<()> {

@@ -1,7 +1,7 @@
 use super::{artifact, PlatformReport};
 use crate::{
-    CjuResult, Controls, DeviceInfo, Error, Frame, PixelFormat, PlatformBackend, PlatformStream,
-    ResultCode, VideoDesc,
+    CjuResult, DeviceInfo, Error, Frame, PixelFormat, PlatformBackend, PlatformStream, ResultCode,
+    VideoDesc,
 };
 use std::ffi::c_void;
 use std::path::{Path, PathBuf};
@@ -271,10 +271,6 @@ impl WindowsDirectShowStream {
 impl PlatformStream for WindowsDirectShowStream {
     fn push_frame(&mut self, frame: &Frame<'_>) -> CjuResult<()> {
         self.write_nv12(frame.planes[0], frame.timestamp_ns)
-    }
-
-    fn update_controls(&mut self, _controls: &Controls) -> CjuResult<()> {
-        Ok(())
     }
 
     fn close(&mut self) -> CjuResult<()> {
