@@ -5,7 +5,7 @@ Build and ship CamJongUn-owned artifacts only:
 - `com.camjongun.virtual-camera.systemextension`
 - `camjongun-mac-virtualcam.plugin` if legacy DAL support is kept
 - `camjongun-installer-helper`
-- generated CamJongUn Camera Extension UUIDs per virtual camera
+- generated CamJongUn Camera Extension UUIDs for the app-owned camera
 
 Runtime/install behavior:
 

@@ -8,12 +8,12 @@ Build and ship:
 Runtime/install behavior:
 
 - Require or install `v4l2loopback` for the target distro.
-- Ensure a `/dev/video*` output device exists for each CamJongUn-managed camera.
+- Ensure a `/dev/video*` output device exists for the app-owned CamJongUn camera.
 - Use CamJongUn camera labels and registry metadata.
 - Load/configure `v4l2loopback` through the helper or package scripts, never by asking SDK users to run commands manually.
 - Do not reuse OBS labels or config paths.
-- Use `v4l2loopback-ctl` when available so multiple devices can be added
-  without unloading/reloading the kernel module.
+- Use `v4l2loopback-ctl` when available so the CamJongUn-owned device can be
+  added without unloading/reloading the kernel module.
 - Refuse destructive unloads unless the device is proven to be CamJongUn-owned.
 
 Source references:

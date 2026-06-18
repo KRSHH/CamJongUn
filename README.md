@@ -61,10 +61,10 @@ behavior in Rust crates, and document unavoidable OBS patches in `patches/`.
 
 The SDK scaffold now includes:
 
-- a multi-camera Rust API
+- a single app-owned virtual camera Rust API
 - a Rust C ABI crate for non-Rust callers
 - a persistent CamJongUn device registry
-- stream/device management entry points
+- camera naming/editing, install/uninstall, and stream management entry points
 - `camjongunctl` for create/list/delete/install/uninstall/doctor
 - `camjongun-installer-helper` as the future privileged install bridge
 - `identity-rules.md` for OBS conflict avoidance
@@ -78,9 +78,9 @@ The SDK scaffold now includes:
 ## Platform Shipping Requirements
 
 Windows needs built DirectShow module DLLs. Developer apps should call the SDK
-install API; the SDK launches the CamJongUn helper once with UAC and the helper
-silently registers both 64-bit and 32-bit modules. Developer apps should not
-spawn PowerShell, call `regsvr32`, or copy DLLs manually.
+camera install API; the SDK launches the CamJongUn helper once with UAC and the
+helper silently registers both 64-bit and 32-bit modules. Developer apps should
+not spawn PowerShell, call `regsvr32`, or copy DLLs manually.
 
 macOS needs bundled and signed plugin/system-extension artifacts, bundle IDs,
 UUIDs, entitlements, `/Applications` placement behavior, and user approval
@@ -92,8 +92,9 @@ must install or require that module per distro.
 
 ## Current Status
 
-This now builds a standalone Rust CamJongUn SDK scaffold and tools. Device
-create/list/delete is implemented through the CamJongUn registry. Windows
+This now builds a standalone Rust CamJongUn SDK scaffold and tools. The runtime
+owns one virtual camera per developer app/owner. Repeated create/ensure calls
+update that app camera instead of accumulating OS camera devices. Windows
 install/uninstall and DirectShow shared-memory frame delivery are wired through
 the Rust adapter and packaged helper. macOS and Linux still expose artifact and
 privilege contracts while their frame delivery remains backend work.

@@ -10,12 +10,12 @@ patch in `../patches`.
 ## Platform Targets
 
 - `windows/`: DirectShow module generation, CLSID templating, registration
-  helper integration, and per-camera shared memory queue names.
+  helper integration, and the CamJongUn shared memory queue.
 - `macos/`: Camera Extension/DAL bundle identity templating, signing-ready
   packaging, activation/deactivation helper integration.
-- `linux/`: `v4l2loopback` helper integration, device mapping, and per-camera
+- `linux/`: `v4l2loopback` helper integration, device mapping, and CamJongUn
   label management.
 
 The Rust SDK and tests are already wired to report expected artifact names. The
 native work should make those reports go from `missing` to `present`, then wire
-streaming.
+streaming where the platform adapter does not already own it.

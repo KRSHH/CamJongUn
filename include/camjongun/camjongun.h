@@ -52,8 +52,19 @@ typedef struct cju_video_desc {
 
 CJU_API int cju_runtime_init(void);
 CJU_API void cju_runtime_shutdown(void);
+
+/* Single app-owned virtual camera API. create/ensure returns the same camera
+ * for the current app on later calls and updates its display name. */
+CJU_API int cju_camera_ensure(const char *display_name, cju_device_id *out_id);
+CJU_API int cju_camera_rename(const char *display_name);
+CJU_API int cju_camera_install(void);
+CJU_API int cju_camera_uninstall(void);
+
+/* Compatibility aliases for older callers. This API targets the same
+ * app-owned camera as cju_camera_ensure. */
 CJU_API int cju_device_create(const char *display_name, cju_device_id *out_id);
 CJU_API int cju_device_delete(cju_device_id id);
+
 CJU_API const char *cju_result_message(int result);
 CJU_API const char *cju_last_error(void);
 

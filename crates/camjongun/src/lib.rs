@@ -223,6 +223,14 @@ pub struct DeviceCreateDesc {
     pub producer_policy: ProducerPolicy,
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct DeviceUpdateDesc {
+    pub display_name: Option<String>,
+    pub preferred_video: Option<VideoDesc>,
+    pub producer_policy: Option<ProducerPolicy>,
+    pub enabled: Option<bool>,
+}
+
 #[derive(Debug, Clone)]
 pub struct DeviceInfo {
     pub id: DeviceId,
@@ -324,11 +332,23 @@ impl Runtime {
             ));
         }
 
+        let owner_app = desc.owner_app.unwrap_or_else(|| self.app_name.clone());
+        if let Some(mut device) = self.find_owner_device(&owner_app)? {
+            device.display_name = desc.display_name;
+            device.preferred_video = desc.preferred_video;
+            normalize_video(&mut device.preferred_video);
+            device.producer_policy = desc.producer_policy;
+            device.enabled = true;
+            device.last_error.clear();
+            self.registry.upsert(&device)?;
+            return Ok(device.id);
+        }
+
         let id = DeviceId::new_generated();
         let mut device = DeviceInfo {
             id,
             display_name: desc.display_name,
-            owner_app: desc.owner_app.unwrap_or_else(|| self.app_name.clone()),
+            owner_app,
             platform_identity: make_platform_identity(&id),
             device_path: make_device_path(&id),
             preferred_video: desc.preferred_video,
@@ -343,6 +363,52 @@ impl Runtime {
         normalize_video(&mut device.preferred_video);
         self.registry.upsert(&device)?;
         Ok(id)
+    }
+
+    pub fn ensure_camera(&self, display_name: impl Into<String>) -> CjuResult<DeviceInfo> {
+        let id = self.create_device(DeviceCreateDesc {
+            display_name: display_name.into(),
+            owner_app: Some(self.app_name.clone()),
+            preferred_video: VideoDesc::default(),
+            producer_policy: ProducerPolicy::RejectSecond,
+        })?;
+        self.registry.get(id)
+    }
+
+    pub fn get_camera(&self) -> CjuResult<DeviceInfo> {
+        self.find_owner_device(&self.app_name)?
+            .ok_or_else(|| Error::new(ResultCode::NotFound, "app camera has not been created"))
+    }
+
+    pub fn update_camera(&self, update: DeviceUpdateDesc) -> CjuResult<DeviceInfo> {
+        let device = self.get_camera()?;
+        self.update_device(device.id, update)
+    }
+
+    pub fn update_device(&self, id: DeviceId, update: DeviceUpdateDesc) -> CjuResult<DeviceInfo> {
+        let mut device = self.registry.get(id)?;
+        if let Some(display_name) = update.display_name {
+            if display_name.trim().is_empty() {
+                return Err(Error::new(
+                    ResultCode::InvalidArgument,
+                    "display name is required",
+                ));
+            }
+            device.display_name = display_name;
+        }
+        if let Some(mut preferred_video) = update.preferred_video {
+            normalize_video(&mut preferred_video);
+            device.preferred_video = preferred_video;
+        }
+        if let Some(producer_policy) = update.producer_policy {
+            device.producer_policy = producer_policy;
+        }
+        if let Some(enabled) = update.enabled {
+            device.enabled = enabled;
+        }
+        device.last_error.clear();
+        self.registry.upsert(&device)?;
+        Ok(device)
     }
 
     pub fn delete_device(&self, id: DeviceId) -> CjuResult<()> {
@@ -365,6 +431,10 @@ impl Runtime {
         self.registry.get(id)
     }
 
+    pub fn install_camera(&self) -> CjuResult<()> {
+        self.install_device(self.get_camera()?.id)
+    }
+
     pub fn install_device(&self, id: DeviceId) -> CjuResult<()> {
         let mut device = self.registry.get(id)?;
         match self.backend.device_install(&device) {
@@ -380,6 +450,10 @@ impl Runtime {
                 Err(err)
             }
         }
+    }
+
+    pub fn uninstall_camera(&self) -> CjuResult<()> {
+        self.uninstall_device(self.get_camera()?.id)
     }
 
     pub fn uninstall_device(&self, id: DeviceId) -> CjuResult<()> {
@@ -428,6 +502,18 @@ impl Runtime {
             platform,
             open: true,
         })
+    }
+
+    pub fn open_camera_stream(&self, video: VideoDesc) -> CjuResult<Stream<'_>> {
+        self.open_stream(self.get_camera()?.id, video)
+    }
+
+    fn find_owner_device(&self, owner_app: &str) -> CjuResult<Option<DeviceInfo>> {
+        Ok(self
+            .registry
+            .load()?
+            .into_iter()
+            .find(|device| device.owner_app == owner_app))
     }
 }
 

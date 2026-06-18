@@ -1,5 +1,6 @@
 use camjongun::{
-    DeviceCreateDesc, DeviceId, ProducerPolicy, ResultCode, Runtime, RuntimeOptions, VideoDesc,
+    DeviceCreateDesc, DeviceId, DeviceUpdateDesc, ProducerPolicy, ResultCode, Runtime,
+    RuntimeOptions, VideoDesc,
 };
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int};
@@ -67,6 +68,48 @@ pub unsafe extern "C" fn cju_device_create(
         ResultCode::Ok as c_int
     })
     .unwrap_or_else(set_error_and_code)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn cju_camera_ensure(
+    display_name: *const c_char,
+    out_id: *mut CjuDeviceId,
+) -> c_int {
+    cju_device_create(display_name, out_id)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn cju_camera_rename(display_name: *const c_char) -> c_int {
+    if display_name.is_null() {
+        return ResultCode::InvalidArgument as c_int;
+    }
+    let name = match CStr::from_ptr(display_name).to_str() {
+        Ok(value) => value.to_string(),
+        Err(_) => return ResultCode::InvalidArgument as c_int,
+    };
+
+    with_runtime(|runtime| {
+        runtime.update_camera(DeviceUpdateDesc {
+            display_name: Some(name),
+            ..DeviceUpdateDesc::default()
+        })
+    })
+    .map(|_| ResultCode::Ok as c_int)
+    .unwrap_or_else(set_error_and_code)
+}
+
+#[no_mangle]
+pub extern "C" fn cju_camera_install() -> c_int {
+    with_runtime(|runtime| runtime.install_camera())
+        .map(|_| ResultCode::Ok as c_int)
+        .unwrap_or_else(set_error_and_code)
+}
+
+#[no_mangle]
+pub extern "C" fn cju_camera_uninstall() -> c_int {
+    with_runtime(|runtime| runtime.uninstall_camera())
+        .map(|_| ResultCode::Ok as c_int)
+        .unwrap_or_else(set_error_and_code)
 }
 
 #[no_mangle]

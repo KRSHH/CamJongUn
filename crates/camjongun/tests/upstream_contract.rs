@@ -200,6 +200,58 @@ fn registry_create_list_get_delete_round_trip_is_stable() {
 }
 
 #[test]
+fn runtime_keeps_one_camera_per_app_owner() {
+    let registry_path = temp_registry_path("single-camera");
+    let runtime = Runtime::new(RuntimeOptions {
+        app_name: "single-camera-test".to_string(),
+        registry_path: Some(registry_path.clone()),
+        auto_install_helper: false,
+    })
+    .expect("runtime should initialize");
+
+    let first = runtime
+        .create_device(DeviceCreateDesc {
+            display_name: "First Name".to_string(),
+            owner_app: None,
+            preferred_video: VideoDesc::default(),
+            producer_policy: ProducerPolicy::RejectSecond,
+        })
+        .expect("first camera should be created");
+    let second = runtime
+        .create_device(DeviceCreateDesc {
+            display_name: "Renamed Camera".to_string(),
+            owner_app: None,
+            preferred_video: VideoDesc {
+                width: 640,
+                height: 360,
+                fps_num: 30,
+                fps_den: 1,
+                format: PixelFormat::Nv12,
+            },
+            producer_policy: ProducerPolicy::RejectSecond,
+        })
+        .expect("second create should update existing app camera");
+
+    assert_eq!(first, second);
+    let devices = runtime.list_devices().expect("registry should list");
+    assert_eq!(devices.len(), 1);
+    assert_eq!(devices[0].display_name, "Renamed Camera");
+    assert_eq!(devices[0].owner_app, "single-camera-test");
+
+    let updated = runtime
+        .update_camera(camjongun::DeviceUpdateDesc {
+            display_name: Some("Edited Camera".to_string()),
+            enabled: Some(false),
+            ..Default::default()
+        })
+        .expect("camera should update");
+    assert_eq!(updated.display_name, "Edited Camera");
+    assert!(!updated.enabled);
+
+    let _ = fs::remove_file(registry_path);
+}
+
+#[test]
 fn registry_ignores_malformed_lines_and_keeps_valid_rows() {
     let registry_path = temp_registry_path("compat");
     let valid_id = "cju-compat";

@@ -12,7 +12,7 @@ Outputs:
 
 Rules:
 
-- Generate one CLSID per CamJongUn virtual camera.
+- Use a CamJongUn-owned CLSID for the app-owned virtual camera.
 - Use CamJongUn display names and registry entries.
 - Do not reuse OBS DLL names or CLSIDs.
 - Do not install into OBS plugin directories.
